@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .a4-paper { width: 210mm; min-height: 297mm; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: auto; padding: 2rem; }
+        .template-modern { font-family: sans-serif; border-left: 8px solid #3b82f6; }
+        .template-modern h1 { color: #2563eb; }
+        .template-classic { font-family: 'Times New Roman', serif; text-align: center; }
+        .template-classic hr { border-top: 2px solid black; }
+        .template-creative { font-family: 'Courier New', monospace; background-color: #fdf2f8; }
+        .template-creative h1 { color: #db2777; text-transform: uppercase; letter-spacing: 2px; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col overflow-hidden">
+    <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shrink-0 z-10">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">AI</div>
+            <h1 class="text-xl font-bold text-gray-800">ResumeBuilder</h1>
+        </div>
+        <div id="ats-badge" class="hidden bg-gray-100 px-4 py-2 rounded-full border border-gray-300 flex items-center gap-2">
+            <span class="text-sm font-medium text-gray-600">ATS Score:</span>
+            <span id="score-val" class="text-lg font-bold text-gray-900">0%</span>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="checkATS()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">Check ATS</button>
+            <button onclick="downloadPDF()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">Export PDF</button>
+        </div>
+    </header>
+    <main class="flex flex-1 overflow-hidden">
+        <aside class="w-[400px] bg-white border-r border-gray-200 overflow-y-auto p-6 flex flex-col gap-6 shrink-0">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Template</label>
+                <select id="template-selector" onchange="changeTemplate()" class="w-full border border-gray-300 rounded-md p-2 text-sm"><option value="modern">Modern</option><option value="classic">Classic</option><option value="creative">Creative</option></select>
+            </div>
+            <hr>
+            <div class="space-y-4">
+                <h3 class="font-semibold text-gray-900">Details</h3>
+                <input type="text" id="input-name" class="w-full border p-2 text-sm rounded" placeholder="Full Name" oninput="updateResume()">
+                <input type="text" id="input-title" class="w-full border p-2 text-sm rounded" placeholder="Job Title" oninput="updateResume()">
+                <input type="text" id="input-email" class="w-full border p-2 text-sm rounded" placeholder="Email" oninput="updateResume()">
+                <input type="text" id="input-phone" class="w-full border p-2 text-sm rounded" placeholder="Phone" oninput="updateResume()">
+            </div>
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <label class="block text-xs font-bold text-blue-800 mb-2">Target Job Description</label>
+                <textarea id="job-description" rows="4" class="w-full border p-2 text-xs rounded" placeholder="Paste job posting here..."></textarea>
+            </div>
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-sm font-medium">Summary</label>
+                    <button onclick="generateAISuggestion()" class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">✨ AI Generate</button>
+                </div>
+                <textarea id="input-summary" rows="4" class="w-full border p-2 text-sm rounded" placeholder="Summary..." oninput="updateResume()"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Experience</label>
+                <textarea id="input-experience" rows="6" class="w-full border p-2 text-sm rounded" placeholder="• Experience..." oninput="updateResume()"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Skills</label>
+                <input type="text" id="input-skills" class="w-full border p-2 text-sm rounded" placeholder="Skills..." oninput="updateResume()">
+            </div>
+            <div id="missing-keywords" class="text-xs text-red-500 mt-2 font-medium"></div>
+        </aside>
+        <section class="flex-1 bg-gray-500 overflow-y-auto p-8 flex justify-center">
+            <div id="resume-preview" class="a4-paper template-modern text-left">
+                <div class="mb-6 pb-4 border-b border-gray-300">
+                    <h1 id="output-name" class="text-4xl font-bold text-gray-900 mb-1">Your Name</h1>
+                    <p id="output-title" class="text-xl text-blue-600 mb-3">Job Title</p>
+                    <div class="text-sm text-gray-600 flex gap-4"><span id="output-email">email</span> | <span id="output-phone">phone</span></div>
+                </div>
+                <div class="mb-6"><h2 class="text-lg font-bold uppercase mb-2">Profile</h2><p id="output-summary" class="text-gray-700 text-sm">Summary...</p></div>
+                <div class="mb-6"><h2 class="text-lg font-bold uppercase mb-2">Experience</h2><div id="output-experience" class="text-gray-700 text-sm whitespace-pre-line">Experience...</div></div>
+                <div class="mb-6"><h2 class="text-lg font-bold uppercase mb-2">Skills</h2><p id="output-skills" class="text-gray-700 text-sm">Skills...</p></div>
+            </div>
+        </section>
+    </main>
+    <script>
+        const API_KEY = "AIzaSyB9KyLmXf3GjKnKN-keB8U3EGc-1l815EI"; 
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        function saveToLocal() {
+            const data = {
+                name: document.getElementById('input-name').value, title: document.getElementById('input-title').value,
+                email: document.getElementById('input-email').value, phone: document.getElementById('input-phone').value,
+                summary: document.getElementById('input-summary').value, experience: document.getElementById('input-experience').value,
+                skills: document.getElementById('input-skills').value, jobDesc: document.getElementById('job-description').value
+            };
+            localStorage.setItem('resumeData', JSON.stringify(data));
+        }
+        function loadFromLocal() {
+            const saved = localStorage.getItem('resumeData');
+            if (saved) {
+                const data = JSON.parse(saved);
+                document.getElementById('input-name').value = data.name || ''; document.getElementById('input-title').value = data.title || '';
+                document.getElementById('input-email').value = data.email || ''; document.getElementById('input-phone').value = data.phone || '';
+                document.getElementById('input-summary').value = data.summary || ''; document.getElementById('input-experience').value = data.experience || '';
+                document.getElementById('input-skills').value = data.skills || ''; document.getElementById('job-description').value = data.jobDesc || '';
+                updateResume(); 
+            }
+        }
+        function updateResume() {
+            document.getElementById('output-name').innerText = document.getElementById('input-name').value || "Your Name";
+            document.getElementById('output-title').innerText = document.getElementById('input-title').value || "Job Title";
+            document.getElementById('output-email').innerText = document.getElementById('input-email').value || "email";
+            document.getElementById('output-phone').innerText = document.getElementById('input-phone').value || "phone";
+            document.getElementById('output-summary').innerText = document.getElementById('input-summary').value || "Summary...";
+            document.getElementById('output-experience').innerText = document.getElementById('input-experience').value || "Experience...";
+            document.getElementById('output-skills').innerText = document.getElementById('input-skills').value || "Skills...";
+            saveToLocal();
+        }
+        async function generateAISuggestion() {
+            const jobDesc = document.getElementById('job-description').value;
+            const title = document.getElementById('input-title').value;
+            if (!jobDesc) { alert("Please paste a Job Description first!"); return; }
+            const btn = document.querySelector('button[onclick="generateAISuggestion()"]');
+            btn.innerText = "Thinking..."; btn.disabled = true;
+            const prompt = `Act as a resume writer. Job: "${jobDesc.substring(0, 400)}...". Current Title: "${title}". Write a 3-sentence summary.`;
+            try {
+                const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                const data = await response.json();
+                if (data.candidates) {
+                    const aiText = data.candidates[0].content.parts[0].text;
+                    const summaryBox = document.getElementById('input-summary');
+                    summaryBox.value = ""; let i = 0;
+                    const interval = setInterval(() => { summaryBox.value += aiText.charAt(i); updateResume(); i++; if (i > aiText.length - 1) clearInterval(interval); }, 10);
+                }
+            } catch (e) { alert("Check API Key"); }
+            btn.innerText = "✨ AI Generate"; btn.disabled = false;
+        }
+        function checkATS() {
+            const resumeText = (document.getElementById('input-summary').value + " " + document.getElementById('input-experience').value + " " + document.getElementById('input-skills').value).toLowerCase();
+            const jobDesc = document.getElementById('job-description').value.toLowerCase();
+            if (!jobDesc) { alert("Paste Job Description!"); return; }
+            const words = jobDesc.match(/\b(\w+)\b/g); 
+            const keywords = [...new Set(words.filter(w => w.length > 4))];
+            let matchCount = 0; let missing = [];
+            keywords.forEach(w => { if (resumeText.includes(w)) matchCount++; else missing.push(w); });
+            const score = Math.round((matchCount / keywords.length) * 100);
+            document.getElementById('ats-badge').classList.remove('hidden'); document.getElementById('ats-badge').classList.add('flex');
+            document.getElementById('score-val').innerText = score + "%";
+            document.getElementById('missing-keywords').innerText = "Missing: " + missing.slice(0, 6).join(", ");
+        }
+        function downloadPDF() {
+            const element = document.getElementById('resume-preview');
+            html2pdf().set({ margin: 0, filename: 'resume.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(element).save();
+        }
+        function changeTemplate() {
+            const t = document.getElementById('template-selector').value; const p = document.getElementById('resume-preview');
+            p.classList.remove('template-modern', 'template-classic', 'template-creative'); p.classList.add(`template-${t}`);
+        }
+        window.onload = loadFromLocal;
+    </script>
+</body>
+</html>
